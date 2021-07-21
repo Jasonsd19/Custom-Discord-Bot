@@ -197,7 +197,7 @@ async def play(ctx, name):
   if voiceChannel != None and isPlayingAudio == False:
     isPlayingAudio = True
     try:
-      voiceChannel.play(discord.FFmpegPCMAudio(name + '.mp3'))
+      voiceChannel.play(discord.FFmpegPCMAudio('audio/' + name + '.mp3'))
       while voiceChannel.is_playing():
         await asyncio.sleep(0.1)
       await asyncio.sleep(1)
