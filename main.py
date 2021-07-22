@@ -9,6 +9,7 @@ from discord.ext import tasks, commands
 from keep_alive import keep_alive
 from replit import db
 import connectFour as c4
+from bs4 import BeautifulSoup
 
 bot = commands.Bot(command_prefix='$')
 
@@ -229,6 +230,14 @@ async def leave(ctx):
   if voiceChannel != None:
     await voiceChannel.disconnect()
     voiceChannel = None
+
+@bot.command()
+async def flip(ctx):
+  r = requests.get('https://www.random.org/coins/?num=1&cur=60-cad.0100c')
+  soup = BeautifulSoup(r.text, 'html.parser')
+  for link in soup.find_all('img'):
+    img = link.get('src')
+  await ctx.send('https://www.random.org/coins/' + img)
 
 @tasks.loop(minutes=10)
 async def reminder():
