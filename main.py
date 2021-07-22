@@ -110,22 +110,6 @@ async def delete(ctx, index: int):
   else:
     await ctx.send("Nice try, but you're not Jason.")
 
-@tasks.loop(minutes=10)
-async def remindTest():
-  global isActive2
-  global testReminder
-  # if discord is active and it has been 5 hours since the last message
-  # then we will send another reminder
-  if isActive2 and datetime.datetime.now() >= testReminder:
-    testReminder = datetime.datetime.now() + datetime.timedelta(hours=5)
-    channel = bot.get_channel(866903190082682910)
-    await channel.send("<@!628081471785009162> Study for your test or you're gonna fail - Patrick")
-    isActive2 = False
-
-@remindTest.before_loop
-async def before_remindTest():
-  await bot.wait_until_ready()
-
 ###################################
 #           Connect Four          #
 ###################################
@@ -240,8 +224,6 @@ def cleanupGame():
 # db['testReminder'] = datetime.datetime.now()
 # db['memeReminder'] = datetime.datetime.now()
 
-remindTest.start()
-
 bot.add_cog(apiCalls.WallStreetBetsApi(bot))
 bot.add_cog(apiCalls.MemeApi(bot))
 bot.add_cog(apiCalls.coinflipAPI(bot))
@@ -251,6 +233,7 @@ bot.add_cog(apiCalls.insultApi(bot))
 bot.add_cog(audioPlayer.audioPlayer(bot))
 
 bot.add_cog(reminders.remindMove(bot))
+bot.add_cog(reminders.remindTest(bot))
 
 keepAlive()
 bot.run(os.environ['token'])
