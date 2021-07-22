@@ -8,8 +8,9 @@ import asyncio
 from discord.ext import tasks, commands
 from keep_alive import keep_alive
 from replit import db
-import connectFour as c4
 from bs4 import BeautifulSoup
+
+import connectFour as c4
 
 bot = commands.Bot(command_prefix='$')
 
