@@ -21,6 +21,12 @@ sleep_words = {"sleep", "sleeping", "going to bed"}
 isActive = False
 isActive2 = False
 
+#Loop Vars
+moveReminder = datetime.datetime.now()
+testReminder = datetime.datetime.now()
+memeReminder = datetime.datetime.now()
+#Loop Vars
+
 #Audio Vars
 voiceChannel = None
 isPlayingAudio = False
@@ -191,6 +197,10 @@ async def join(ctx):
 @bot.command(description='$play [filename]\nFilename has to be a file in a local directory\nThe bot will join the voice channel the user is in, play the audio file, then leave.',
 help='Allows the bot to join in the voice chat and play an audio file!')
 async def play(ctx, name):
+  if name == 'list':
+    await ctx.send(listClips())
+    return
+
   global voiceChannel
   global isPlayingAudio
   global leaveTimer
@@ -220,10 +230,14 @@ async def leave(ctx):
     await voiceChannel.disconnect()
     voiceChannel = None
 
-@tasks.loop(hours=2)
+@tasks.loop(minutes=10)
 async def reminder():
   global isActive
-  if isActive:
+  global moveReminder
+  # if discord is active and it has been 2 hours since the last message
+  # then we will send another reminder
+  if isActive and datetime.datetime.now() >= moveReminder:
+    moveReminder = datetime.datetime.now() + datetime.timedelta(hours=2)
     channel = bot.get_channel(866903190082682910)
     await channel.send("Remember to stand up and exercise (or stretch)! Also drink some water and stay hydrated! Especially you <@187083047340998656> ")
     isActive = False
@@ -232,10 +246,14 @@ async def reminder():
 async def before_reminder():
   await bot.wait_until_ready()
 
-@tasks.loop(hours=5)
+@tasks.loop(minutes=10)
 async def remindTest():
   global isActive2
-  if isActive2:
+  global testReminder
+  # if discord is active and it has been 5 hours since the last message
+  # then we will send another reminder
+  if isActive2 and datetime.datetime.now() >= testReminder:
+    testReminder = datetime.datetime.now() + datetime.timedelta(hours=5)
     channel = bot.get_channel(866903190082682910)
     await channel.send("<@!628081471785009162> Study for your test or you're gonna fail - Patrick")
     isActive2 = False
@@ -244,16 +262,20 @@ async def remindTest():
 async def before_remindTest():
   await bot.wait_until_ready()
 
-@tasks.loop(hours=16)
+@tasks.loop(minutes=10)
 async def factAndPicAndMeme():
-  animChannel = bot.get_channel(802692284558475305)
-  memeChannel = bot.get_channel(866938492596387850)
-  await animChannel.send(getCatFact())
-  await animChannel.send("Now enjoy a picture of a random animal.")
-  await asyncio.sleep(2)
-  await animChannel.send(getAnimalPic())
-  await asyncio.sleep(2)
-  await memeChannel.send(getMeme())
+  global memeReminder
+  # if it has been  hours 8 since the last fact/pic/meme then send another
+  if datetime.datetime.now() >= memeReminder:
+    memeReminder = datetime.datetime.now() + datetime.timedelta(hours=8)
+    animChannel = bot.get_channel(802692284558475305)
+    memeChannel = bot.get_channel(866938492596387850)
+    await animChannel.send(getCatFact())
+    await animChannel.send("Now enjoy a picture of a random animal.")
+    await asyncio.sleep(2)
+    await animChannel.send(getAnimalPic())
+    await asyncio.sleep(2)
+    await memeChannel.send(getMeme())
 
 @factAndPicAndMeme.before_loop
 async def before_factAndPic():
@@ -292,6 +314,14 @@ def getInsult():
   r = requests.get('https://evilinsult.com/generate_insult.php?lang=en&type=text')
   string = r.text
   return string
+
+def listClips():
+  result = ''
+  files = os.listdir('audio/')
+  for file in files:
+    name = file.split('.')[0]
+    result += '[' + name + '] '
+  return result
 
 ###################################
 #           Connect Four          #
@@ -400,6 +430,12 @@ def cleanupGame():
 ##########################################
 #           Rock Paper Scissors          # (do later lol)
 ##########################################
+
+# This results in circularReference error not sure why??
+# Can't use database to store datetime value, time to add more variables :)
+# db['moveReminder'] = datetime.datetime.now()
+# db['testReminder'] = datetime.datetime.now()
+# db['memeReminder'] = datetime.datetime.now()
 
 reminder.start()
 remindTest.start()
