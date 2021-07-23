@@ -10,8 +10,7 @@ class remindMove(commands.Cog):
 
   @commands.Cog.listener()
   async def on_message(self, message):
-    if message.author != self.bot.user:
-      self.isActive = True
+    self.isActive = True
 
   @tasks.loop(minutes=10)
   async def reminder(self):
@@ -32,8 +31,7 @@ class remindTest(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-      if message.author != self.bot.user:
-        self.isActive = True
+      self.isActive = True
 
   @tasks.loop(minutes=10)
   async def reminder(self):

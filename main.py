@@ -8,22 +8,12 @@ from replit import db
 import apiCalls
 import audioPlayer
 import reminders
-
+import messageResponder
 import connectFour as c4
 
 bot = commands.Bot(command_prefix='$')
 
 game = discord.Game("$help for more information")
-
-sad_words  = {"sad", "horrible", "lonely", "depressed", ":(", "gloomy", "tragic", "despair", "pain", "forlorn", "hurt", "hurting"}
-
-sleep_words = {"sleep", "sleeping", "going to bed"}
-
-isActive2 = False
-
-#Loop Vars
-testReminder = datetime.datetime.now()
-#Loop Vars
 
 #Game Vars
 isPlaying = False
@@ -34,8 +24,6 @@ turn = None
 board = None
 #Game Vars
 
-winnersID = 817519861906669640
-
 @bot.event
 async def on_ready():
   print("We have logged in as {0.user}".format(bot))
@@ -43,72 +31,10 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-  global isActive
-  global isActive2
-
   if message.author == bot.user or message.author.bot:
     return
 
-  if message.author != bot.user:
-    isActive2 = True
-
-  if sad_words.intersection(message.content.lower().split()):
-    await message.channel.send("Well {0}, This server has friends that still care and love you <:patW:673433778944737310>.".format(message.author.mention))
-    return
-
-  if sleep_words.intersection(message.content.lower().split()):
-    await message.channel.send("Good night {0}, hope you enjoyed your stay <:peepolove:822337341892853790>.".format(message.author.mention))
-    return
-
-  if winnersID in message.raw_role_mentions:
-    await message.add_reaction("<:pogNuts:827445043018858526>")
-    return
-
-  if bot.user.id in message.raw_mentions:
-    if message.author.id == 387855771355840512:
-      await message.channel.send("I am at your service oh great and powerful Jason <:o7:822333430166454312>.")
-      return
-    await message.channel.send("<:wutface:823056657110007839> Don't @ me loser")
-    return
-
   await bot.process_commands(message)
-
-@bot.command(description='use format\n$suggest [message]\nTo register your suggestion. Jason can review them later',
-help='Simply enter any suggestion and it will be recorded in our database.')
-async def suggest(ctx, *, message: str):
-  try:
-    db["Suggestions"].append(message)
-    await ctx.send("Thanks for your suggestion, it has been recorded!")
-  except:
-    await ctx.send("Sorry there was an error recording your suggestion :(")
-
-@bot.command(description='Lists all the suggestions',
-             help='Only Jason can use this :)')
-async def list(ctx):
-  if ctx.author.id == 387855771355840512:
-    result = 'Suggestions:\n'
-    i = 1
-    for suggestion in db['Suggestions']:
-      result += str(i) + ': ' + suggestion + '.\n'
-      i += 1
-    await ctx.send(result)
-  else:
-    await ctx.send("Nice try, but you're not Jason.")
-
-@bot.command(description='Delete suggestion at given index\n$remove 0\nWill remove the first suggestion.',
-help='Only Jason can use this :)')
-async def delete(ctx, index: int):
-  if ctx.author.id == 387855771355840512:
-    if len(db['Suggestions']) == 0:
-      await ctx.send("There is nothing to delete!")
-      return
-    try:
-      removed = db['Suggestions'].pop(index)
-      await ctx.send("Successfully removed suggestion:\n" + removed)
-    except:
-      await ctx.send("Unable to remove given index, perhaps it doesn't exist?")
-  else:
-    await ctx.send("Nice try, but you're not Jason.")
 
 ###################################
 #           Connect Four          #
@@ -234,6 +160,8 @@ bot.add_cog(audioPlayer.audioPlayer(bot))
 
 bot.add_cog(reminders.remindMove(bot))
 bot.add_cog(reminders.remindTest(bot))
+
+bot.add_cog(messageResponder.messageResponder(bot))
 
 keepAlive()
 bot.run(os.environ['token'])
