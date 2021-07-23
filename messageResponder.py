@@ -29,7 +29,12 @@ class messageResponder(commands.Cog):
   async def respondToMention(self, message):
     if self.bot.user.id in message.raw_mentions:
       if message.author.id == 387855771355840512:
+        #If I (Jason) mention the bot
         await message.channel.send("I am at your service oh great and powerful Jason <:o7:822333430166454312>.")
+        return
+      if self.bot.user.id in message.raw_mentions and message.author.id == 190583718182780928:
+        #If Ray mentions the bot
+        await message.channel.send("Hello father. I love you.")
         return
       await message.channel.send("<:wutface:823056657110007839> Don't @ me loser")
       return

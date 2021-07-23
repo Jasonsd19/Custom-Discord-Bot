@@ -39,6 +39,6 @@ class remindTest(commands.Cog):
     # then we will send another reminder
     if self.isActive and datetime.datetime.now() >= self.testReminder:
       self.testReminder = datetime.datetime.now() + datetime.timedelta(hours=5)
-      channel = bot.get_channel(866903190082682910)
+      channel = self.bot.get_channel(866903190082682910)
       await channel.send("<@!628081471785009162> Study for your test or you're gonna fail - Patrick")
       self.isActive = False
