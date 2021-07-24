@@ -12,6 +12,7 @@ replit = "^3.1.0"
 PyNaCl = "^1.4.0"
 ffmpeg = "^1.4"
 bs4 = "^0.0.1"
+youtube_dl = "^2021.6.6"
 
 [tool.poetry.dev-dependencies]
 

@@ -33,14 +33,14 @@ class Game:
     #checks if the given player has won
 
     #check rows
-    for j in range(self.height - 3):
-        for i in range(self.width):
+    for j in range(self.height):
+        for i in range(self.width - 3):
             if self.board[i][j].getPlayer() == player and self.board[i+1][j].getPlayer() == player and self.board[i+2][j].getPlayer() == player and self.board[i+3][j].getPlayer() == player:
               return True
 
     #check columns
-    for i in range(self.width - 3):
-        for j in range(self.height):
+    for i in range(self.width):
+        for j in range(self.height - 3):
             if self.board[i][j].getPlayer() == player and self.board[i][j+1].getPlayer() == player and self.board[i][j+2].getPlayer() == player and self.board[i][j+3].getPlayer() == player:
               return True
 
@@ -65,7 +65,7 @@ class Game:
       for i in range(self.width):
         nodeString = self.playerToColour(self.board[i][j].getPlayer())
         if i == self.width - 1:
-          result += '│' + nodeString + '│' + '\n════════════════════════════\n'
+          result += '│' + nodeString + '│' + '\n═════════════════════════\n'
         else:
           result += '│' + nodeString + '│'
     return result
@@ -79,7 +79,6 @@ class Game:
       return ":yellow_circle:"
     else:
       return ":red_circle:"
-
 
 #Code below is used to play the game in the terminal (useful for testing)
 

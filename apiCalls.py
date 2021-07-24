@@ -37,7 +37,7 @@ class WallStreetBetsApi(commands.Cog):
   async def wsb(self, ctx):
     await ctx.send(self.topTickers())
     return
-  
+
   def topTickers(self):
     url = "https://apewisdom.io/api/v1.0/filter/wallstreetbets"
     r = self._callApi(url)
@@ -55,22 +55,22 @@ class MemeApi(commands.Cog):
     # Start the loop
     self.factAndPicAndMeme.start()
     return
-  
+
   @commands.command()
   async def meme(self, ctx):
     await ctx.send(self.getMeme())
     return
-  
+
   @commands.command()
   async def animalPic(self, ctx):
     await ctx.send(self.getAnimalPic())
     return
-  
+
   @commands.command()
   async def catFact(self, ctx):
     await ctx.send(self.getCatFact())
     return
-  
+
   @tasks.loop(minutes=10)
   async def factAndPicAndMeme(self):
     # if it has been  hours 8 since the last fact/pic/meme then send another
@@ -95,7 +95,7 @@ class MemeApi(commands.Cog):
     url = 'https://meme-api.herokuapp.com/gimme'
     r = self._callApi(url)
     return r.json()['url']
-  
+
   def getAnimalPic(self):
     i = random.randint(1, 99)
     if i > 66:

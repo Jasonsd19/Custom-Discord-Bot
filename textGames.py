@@ -37,7 +37,8 @@ class connectFourText(commands.Cog):
     if self.isValid(move):
       self.nextBoard(player, move)
       self.isOver = self.hasWon(player)
-    return self.printBoard()
+    else:
+      raise Exception("Invalid move!")
 
   def createEmbed(self, content):
     embed = discord.Embed()
@@ -96,18 +97,30 @@ class connectFourText(commands.Cog):
   @commands.Cog.listener('on_reaction_add')
   async def getNextMove(self, reaction, user):
     if self.isPlaying == True:
+      #check reaction is for the relevant message (our game embed) and if the
+      #user reacting is the user who's turn it currently is
       if reaction.message == self.gameMessage and (user.mention == self.currentPlayer[1] or user.mention == self.currentPlayer[2]):
+        #convert emoji react into column index
         col = self.getColumn(reaction.emoji)
-        self.play(self.currentPlayer[0], col)
-        self.nextPlayer()
+        try:
+          #Perform next move and switch turn to next player
+          self.play(self.currentPlayer[0], col)
+          self.nextPlayer()
+        except:
+          #Invalid move, player can try again, board doesn't change
+          await reaction.message.channel.send("Invalid move!")
         embed = self.createEmbed(self.printBoard())
+        #Update the board display
         await self.gameMessage.edit(embed=embed)
 
       if self.isOver:
+        #We cycle back to the player that made the winning move
         self.nextPlayer()
         await reaction.message.channel.send(self.currentPlayer[1] + " Congratulations you win!")
+        #Reset class variables/attributes for next game
         self.cleanupGame()
-
+      
+      #Remove the reaction applied by the user
       await reaction.remove(user)
       return
     return
