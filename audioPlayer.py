@@ -49,6 +49,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     if self.isPlaying == False:
       source = self.parseCommand(name)
       self.q.enqueue(source)
+      await ctx.send("Added " + source[1] + " to the queue!")
       while self.q.isEmpty() == False:
         #flags that we are now playing music, deters future calls
         self.isPlaying = True
