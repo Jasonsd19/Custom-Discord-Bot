@@ -4,6 +4,7 @@ import asyncio
 import discord
 import os
 import youtube_dl
+from mutagen.mp3 import MP3
 from requests import get
 from discord.ext import tasks, commands
 
@@ -44,35 +45,39 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         #Bot and user are in same voice channel - Do Nothing
         pass
     else:
-      await ctx.send("You need to be in a voice channel!")
+      await ctx.send(embed=self.createEmbed('Error', "You need to be in a voice channel!"), delete_after=30)
       return
 
     #Try to grab audio source - TODO Need to handle HTTP 403 and os errors
     try:
+      #Source is a tuple (audioSource, videoTitle, videoDuration, name)
       source = self.parseCommand(name)
     except:
-      await ctx.send("Unable to play music file, please check command format is correct. If it's correct try again in a short while.")
+      await ctx.send(embed=self.createEmbed('Error', "Unable to play music file, please check command format is correct. If it's correct try again in a short while.", delete_atfer=30))
       return
 
     #we only play music if we are not currently playing music
     if self.q.isEmpty():
       self.q.enqueue(source)
-      await ctx.send("Added " + source[1] + " to the queue!")
+      # await ctx.send("Added " + source[1] + " to the queue!")
+      await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
       while self.q.isEmpty() == False:
         currentSong = self.q.peek().data
         self.voiceClient.play(currentSong[0])
+        await ctx.send(embed=self.createEmbed('Playing', currentSong[1]), delete_after=int(currentSong[2]))
         while self.voiceClient.is_playing() or self.voiceClient.is_paused():
           await asyncio.sleep(1)
         self.voiceClient.stop()
         self.q.dequeue()
         if self.doLoop == True and self.doRemove == False:
           #Grab fresh audio source for the current song and requeue it to loop
-          freshSource = self.parseCommand(currentSong[2])
+          freshSource = self.parseCommand(currentSong[3])
           self.q.enqueue(freshSource)
         self.doRemove = False
     else:
       self.q.enqueue(source)
-      await ctx.send("Added " + source[1] + " to the queue!")
+      # await ctx.send("Added " + source[1] + " to the queue!")
+      await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
 
   @commands.command()
   async def pause(self, ctx):
@@ -93,30 +98,32 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       if name == self.q.peek().data[1]:
         self.doRemove = True
         self.voiceClient.stop()
-        await ctx.send("Removed " + name + " from queue!")
+        # await ctx.send("Removed " + name + " from queue!")
+        await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
         return
       current = self.q.front.next
       index = 1
       while current != None:
         if current.data[1] == name:
           self.q.lList.remove(index)
-          await ctx.send("Removed " + name + " from queue!")
+          # await ctx.send("Removed " + name + " from queue!")
+          await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
           return
         current = current.next
         index += 1
-      await ctx.send("Song " + name + " is not in queue.")
+      await ctx.send(embed=self.createEmbed('Error', f'Song {name} is not in the queue'), delete_after=30)
       return
-    await ctx.send("Queue is empty")
+    await ctx.send(embed=self.createEmbed('Error', "Queue is empty"), delete_after=30)
 
   @commands.command()
   async def loop(self, ctx):
     if self.voiceClient != None:
       if self.doLoop == False:
         self.doLoop = True
-        await ctx.send("We are now looping music")
+        await ctx.send(embed=self.createEmbed('Success', "We are now looping music"), delete_after=30)
       else:
         self.doLoop = False
-        await ctx.send("We are now not looping music")
+        await ctx.send(embed=self.createEmbed('Success', "We are no longer looping music"), delete_after=30)
 
   @commands.command()
   async def leave(self, ctx):
@@ -135,11 +142,11 @@ help='Allows the bot to join in the voice chat and play an audio file!')
   @commands.command()
   async def skip(self, ctx):
     if self.q.isEmpty():
-      await ctx.send("Queue is already empty!")
+      await ctx.send(self.createEmbed('Error', "Queue is already empty!"), delete_after=30)
       return
     name = self.q.peek().data[1]
     self.voiceClient.stop()
-    await ctx.send("Skipped " + name + "!")
+    await ctx.send(embed=self.createEmbed('Success', f'Skipped {name}!'), delete_after=30)
     return
 
   @commands.command()
@@ -149,7 +156,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         volume = int(volume)
         volume = volume / 100
       except:
-        await ctx.send("Invalid command format")
+        await ctx.send(embed=self.createEmbed('Error', "Invalid command format"), delete_after=30)
         return
       if volume >= 0 and volume <= 1:
         self.q.peek().data[0].volume = volume
@@ -157,9 +164,9 @@ help='Allows the bot to join in the voice chat and play an audio file!')
   @commands.command()
   async def list(self, ctx):
     if self.q.isEmpty():
-      await ctx.send(embed=self.createEmbed("The queue is empty."))
+      await ctx.send(embed=self.createEmbed('Queue',"The queue is empty."))
       return
-    await ctx.send(embed=self.createEmbed(self.printQueue()))
+    await ctx.send(embed=self.createEmbed('Queue', self.printQueue()))
 
   @tasks.loop(seconds=30)
   async def checkInactivity(self):
@@ -175,7 +182,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     else:
       return self.getAudioClip(name)
 
-  def grabYTVideo(self, name):
+  def grabYTVideo(self, search):
     ydlOptions = {
     'format': 'bestaudio/best',
     'noplaylist': True}
@@ -184,33 +191,37 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     with youtube_dl.YoutubeDL(ydlOptions) as ydl:
       try:
         #if the get request fails then we have a search string, not a url
-        get(name)
+        get(search)
       except:
-        info = ydl.extract_info(f"ytsearch:{name[1:]}", download=False)['entries'][0]
+        info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
         url = info['url']
         title = info['title']
+        duration = info['duration']
       else:
-        info = ydl.extract_info(name, download=False)
+        info = ydl.extract_info(search, download=False)
         url = info['formats'][0]['url']
         title = info['title']
+        duration = info['duration']
       try:
         #Randomly got a HTTP 403 Forbidden error once, placeholder to handle that for now
-        return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, name)
+        return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, duration, search)
       except:
         raise Exception()
 
-  def getAudioClip(self, name):
+  def getAudioClip(self, search):
     # I don't like this implementation btw
-    title = name + '.mp3'
-    if title in os.listdir('audio/'):
-      return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio('audio/' + name + '.mp3')), title, name)
+    path = 'audio/' + search + '.mp3'
+    if os.path.exists(path):
+      audioFile = MP3(path)
+      duration = int(audioFile.info.length)
+      return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
     else:
       #TODO - Choose specific exception
       raise Exception()
 
-  def createEmbed(self, content):
+  def createEmbed(self, header, content):
     embed = discord.Embed()
-    embed.add_field(name='Queue', value=content, inline=False)
+    embed.add_field(name=header, value=content, inline=False)
     return embed
 
   def listClips(self):
@@ -221,9 +232,9 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     for file in files:
       name = file.split('.')[0]
       if i%5 == 0 and i != 0:
-        result += '[' + name + '] \n'
+        result += f'[{name}]\n'
       else:
-        result += '[' + name + '] '
+        result += f'[{name}]'
       i += 1
     return result
 
@@ -232,7 +243,9 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     current = self.q.front
     index = 1
     while current != None:
-      result += str(index) + ' ' + str(current.data[1]) + '\n'
+      minutes = current.data[2] // 60
+      seconds = current.data[2] % 60
+      result += f'{index}) {current.data[1]} - {minutes}:{seconds}\n'
       current = current.next
       index += 1
     return result
