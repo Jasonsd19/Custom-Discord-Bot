@@ -87,7 +87,7 @@ class connectFourText(commands.Cog):
       #Add reactions to the message as a proxy for player interaction
       for reaction in self.reactions:
         await self.gameMessage.add_reaction(reaction)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
       #Prevents other games from being Initialised
       self.isPlaying = True
     else:

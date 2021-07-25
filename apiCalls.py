@@ -180,3 +180,16 @@ class insultApi(commands.Cog):
     r = self._callApi(url)
     string = r.text
     return string
+
+@addCallApi
+class magic8BallApi(commands.Cog):
+  def __init__(self, bot):
+    self.bot = bot
+
+  @commands.command()
+  async def ask(self, ctx, *args):
+    question = ' '.join(args)
+    url = 'https://8ball.delegator.com/magic/JSON/' + question
+    r = self._callApi(url)
+    responseJSON = r.json()
+    await ctx.send('The magic 8-Ball says: ' + responseJSON['magic']['answer'])

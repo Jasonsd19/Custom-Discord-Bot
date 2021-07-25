@@ -11,9 +11,10 @@ class audioPlayer(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
     self.voiceClient = None
-    self.isPlaying = False
     #Start loop to check for inactivity
     self.Context = None
+    self.doLoop = False
+    self.doRemove = False
     self.q = queue()
     self.checkInactivity.start()
 
@@ -30,42 +31,46 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     #connect to voice channel if not in a voice channel currently
     #or connect to a different voice channel from the one we are currently in
     userVoiceClient = ctx.author.voice
-    if self.voiceClient == None and userVoiceClient:
-      self.voiceClient = await userVoiceClient.channel.connect()
-      await asyncio.sleep(0.1)
-    elif userVoiceClient and userVoiceClient.channel != self.voiceClient.channel:
-      await ctx.invoke(self.bot.get_command('leave'))
-      await asyncio.sleep(0.1)
-      self.voiceClient = await userVoiceClient.channel.connect()
-      await asyncio.sleep(0.1)
-    elif userVoiceClient.channel == self.voiceClient.channel:
-      #Do nothing
-      pass
+    if userVoiceClient:
+      if self.voiceClient == None:
+        self.voiceClient = await userVoiceClient.channel.connect()
+        await asyncio.sleep(0.1)
+      elif userVoiceClient.channel != self.voiceClient.channel:
+        await ctx.invoke(self.bot.get_command('leave'))
+        await asyncio.sleep(0.1)
+        self.voiceClient = await userVoiceClient.channel.connect()
+        await asyncio.sleep(0.1)
+      else:
+        #Bot and user are in same voice channel - Do Nothing
+        pass
     else:
       await ctx.send("You need to be in a voice channel!")
       return
 
-    #we only play music if we are not currently playing music
-    if self.isPlaying == False:
+    #Try to grab audio source - TODO Need to handle HTTP 403 and os errors
+    try:
       source = self.parseCommand(name)
+    except:
+      await ctx.send("Unable to play music file, please check command format is correct. If it's correct try again in a short while.")
+      return
+
+    #we only play music if we are not currently playing music
+    if self.q.isEmpty():
       self.q.enqueue(source)
       await ctx.send("Added " + source[1] + " to the queue!")
       while self.q.isEmpty() == False:
-        #flags that we are now playing music, deters future calls
-        self.isPlaying = True
-        try:
-          self.voiceClient.play(self.q.peek().data[0])
-        except:
-          await ctx.send("Unable to play music file, please check command format is correct.")
-
+        currentSong = self.q.peek().data
+        self.voiceClient.play(currentSong[0])
         while self.voiceClient.is_playing() or self.voiceClient.is_paused():
-          await asyncio.sleep(0.1)
-        await asyncio.sleep(1)
+          await asyncio.sleep(1)
         self.voiceClient.stop()
         self.q.dequeue()
-        self.isPlaying = False
+        if self.doLoop == True and self.doRemove == False:
+          #Grab fresh audio source for the current song and requeue it to loop
+          freshSource = self.parseCommand(currentSong[2])
+          self.q.enqueue(freshSource)
+        self.doRemove = False
     else:
-      source = self.parseCommand(name)
       self.q.enqueue(source)
       await ctx.send("Added " + source[1] + " to the queue!")
 
@@ -82,33 +87,93 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       return
 
   @commands.command()
-  async def stop(self, ctx):
-    if (self.voiceClient != None and (self.voiceClient.is_playing() or self.voiceClient.is_paused())):
-      self.voiceClient.stop()
+  async def remove(self, ctx, *args):
+    name = ' '.join(args)
+    if not self.q.isEmpty():
+      if name == self.q.peek().data[1]:
+        self.doRemove = True
+        self.voiceClient.stop()
+        await ctx.send("Removed " + name + " from queue!")
+        return
+      current = self.q.front.next
+      index = 1
+      while current != None:
+        if current.data[1] == name:
+          self.q.lList.remove(index)
+          await ctx.send("Removed " + name + " from queue!")
+          return
+        current = current.next
+        index += 1
+      await ctx.send("Song " + name + " is not in queue.")
+      return
+    await ctx.send("Queue is empty")
+
+  @commands.command()
+  async def loop(self, ctx):
+    if self.voiceClient != None:
+      if self.doLoop == False:
+        self.doLoop = True
+        await ctx.send("We are now looping music")
+      else:
+        self.doLoop = False
+        await ctx.send("We are now not looping music")
 
   @commands.command()
   async def leave(self, ctx):
     if self.voiceClient != None:
-      if self.voiceClient.is_playing() or self.voiceClient.is_paused():
+      self.doLoop = False
+      if not self.q.isEmpty():
+        self.q = queue()
         self.voiceClient.stop()
+        #Wait for other processes to finish before disconnecting
+        await asyncio.sleep(1)
       await self.voiceClient.disconnect()
-      self.clearVars()
+      self.doRemove = False
+      self.Context = None
+      self.voiceClient = None
+
+  @commands.command()
+  async def skip(self, ctx):
+    if self.q.isEmpty():
+      await ctx.send("Queue is already empty!")
+      return
+    name = self.q.peek().data[1]
+    self.voiceClient.stop()
+    await ctx.send("Skipped " + name + "!")
+    return
+
+  @commands.command()
+  async def volume(self, ctx, volume):
+    if self.voiceClient.is_playing() or self.voiceClient.is_paused():
+      try:
+        volume = int(volume)
+        volume = volume / 100
+      except:
+        await ctx.send("Invalid command format")
+        return
+      if volume >= 0 and volume <= 1:
+        self.q.peek().data[0].volume = volume
+
+  @commands.command()
+  async def list(self, ctx):
+    if self.q.isEmpty():
+      await ctx.send(embed=self.createEmbed("The queue is empty."))
+      return
+    await ctx.send(embed=self.createEmbed(self.printQueue()))
 
   @tasks.loop(seconds=30)
   async def checkInactivity(self):
-    if self.voiceClient != None and len(self.voiceClient.channel.members) == 0:
+    if self.voiceClient != None and len(self.voiceClient.channel.members) == 1:
       await self.Context.invoke(self.bot.get_command('leave'))
 
   def parseCommand(self, name):
     #Determines whether the commands is to play a youtube link,
     #search and play a song on youtube, or play an audio clip
-    if (('youtube.com' in name) or ('youtu.be' in name)):
+    if (('youtube.com' in name) or ('youtu.be' in name)) or (len(name) > 1 and name[0] == '-'):
+      #here '-' symbolises a youtube search instead of a url
       return self.grabYTVideo(name)
-    #here '-' symbolises a youtube search
-    elif len(name) > 1 and name[0] == '-':
-      return self.grabYTVideo(name[1:])
     else:
-      return (discord.FFmpegPCMAudio('audio/' + name + '.mp3'), name)
+      return self.getAudioClip(name)
 
   def grabYTVideo(self, name):
     ydlOptions = {
@@ -121,18 +186,32 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         #if the get request fails then we have a search string, not a url
         get(name)
       except:
-        info = ydl.extract_info(f"ytsearch:{name}", download=False)['entries'][0]
+        info = ydl.extract_info(f"ytsearch:{name[1:]}", download=False)['entries'][0]
         url = info['url']
         title = info['title']
       else:
         info = ydl.extract_info(name, download=False)
         url = info['formats'][0]['url']
         title = info['title']
-      return (discord.FFmpegPCMAudio(url, **ffmpegOptions), title)
+      try:
+        #Randomly got a HTTP 403 Forbidden error once, placeholder to handle that for now
+        return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, name)
+      except:
+        raise Exception()
 
-  def clearVars(self):
-      self.voiceClient = None
-      self.isPlaying = False
+  def getAudioClip(self, name):
+    # I don't like this implementation btw
+    title = name + '.mp3'
+    if title in os.listdir('audio/'):
+      return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio('audio/' + name + '.mp3')), title, name)
+    else:
+      #TODO - Choose specific exception
+      raise Exception()
+
+  def createEmbed(self, content):
+    embed = discord.Embed()
+    embed.add_field(name='Queue', value=content, inline=False)
+    return embed
 
   def listClips(self):
     #TODO - Super ugly, try to format names and make it look nice
@@ -146,6 +225,16 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       else:
         result += '[' + name + '] '
       i += 1
+    return result
+
+  def printQueue(self):
+    result = ''
+    current = self.q.front
+    index = 1
+    while current != None:
+      result += str(index) + ' ' + str(current.data[1]) + '\n'
+      current = current.next
+      index += 1
     return result
 
 class queue:
@@ -186,6 +275,15 @@ class queue:
         previous.next= current.next
         current.next = None
         self.size -= 1
+
+    def get(self, index):
+      if index <= self.size:
+        if index == 0:
+          return self.head
+        current = self.head
+        for i in range(index):
+          current = current.next
+        return current
         
     def length(self):
       return self.size
@@ -204,7 +302,7 @@ class queue:
     self.rear = self.rear.next
 
   def dequeue(self):
-    if self.size == 0:
+    if self.size() == 0:
       return
     self.front = self.front.next
     self.lList.remove(0)
@@ -219,12 +317,3 @@ class queue:
 
   def isEmpty(self):
     return self.size() == 0
-
-  def printQueue(self):
-    result = ''
-    current = self.front
-    while current != None:
-      result += str(current.data[1]) + '---->'
-      current = current.next
-    return result
-    

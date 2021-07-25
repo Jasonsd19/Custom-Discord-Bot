@@ -11,7 +11,7 @@ import reminders
 import messageResponder
 import textGames
 
-bot = commands.Bot(command_prefix='$')
+bot = commands.Bot(command_prefix='$', intents=discord.Intents.all())
 
 game = discord.Game("$help for more information")
 
@@ -37,6 +37,7 @@ bot.add_cog(apiCalls.MemeApi(bot))
 bot.add_cog(apiCalls.coinflipAPI(bot))
 bot.add_cog(apiCalls.diceAPI(bot))
 bot.add_cog(apiCalls.insultApi(bot))
+bot.add_cog(apiCalls.magic8BallApi(bot))
 
 bot.add_cog(audioPlayer.audioPlayer(bot))
 
