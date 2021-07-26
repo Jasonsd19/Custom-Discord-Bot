@@ -48,7 +48,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       await ctx.send(embed=self.createEmbed('Error', "You need to be in a voice channel!"), delete_after=30)
       return
 
-    #Try to grab audio source - TODO Need to handle HTTP 403 and os errors
+    #Try to grab audio source - TODO give specific response for HTTP 403 and os errors
     try:
       #Source is a tuple (audioSource, videoTitle, videoDuration, userInput) - don't like this
       source = self.parseCommand(userInput)
@@ -59,13 +59,12 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     #If queue is empty, we add new song set up the player
     if self.q.isEmpty():
       self.q.add(source)
-      # await ctx.send("Added " + source[1] + " to the queue!")
       #React with emote to denote the request was successful
       await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
       #While queue is not empty, loop through and play all the remaining songs
       while self.q.isEmpty() == False:
         #Current song is the front of the queue (or the head of the linkedlist)
-        currentSong = self.q.head.data
+        currentSong = self.q.getHead().getData()
         self.voiceClient.play(currentSong[0])
         #Create and embeded message to let user know we are playing song, this message will be deleted once the song ends
         await ctx.send(embed=self.createEmbed('Playing', currentSong[1]), delete_after=int(currentSong[2]))
@@ -81,7 +80,6 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         self.doRemove = False
     else:
       self.q.add(source)
-      # await ctx.send("Added " + source[1] + " to the queue!")
       await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
 
   @commands.command()
@@ -97,32 +95,29 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       return
 
   @commands.command()
-  async def remove(self, ctx, *args):
-    name = ' '.join(args)
+  async def remove(self, ctx, index):
+    #Check if user input integer, if so change to 0 based indexing
+    try:
+      index = int(index) - 1
+    except:
+      await ctx.send(embed=self.createEmbed('Error', "Invalid command format"), delete_after=30)
+      return
     #Queue must have songs in it to remove
     if not self.q.isEmpty():
-      #If we're removing the current song being played we do not want it re-added if looping is True
-      if name == self.q.head.data[1]:
+      #If we're removing the current song, set doRemove flag to True so we don't re-add it when looping
+      if index == 0:
         self.doRemove = True
         self.voiceClient.stop()
-        # await ctx.send("Removed " + name + " from queue!")
         await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
         return
-      #Song to be removed is not current song so we start at index 1
-      current = self.q.head.next
-      index = 1
-      while current != None:
-        #Loop until we find the correct song if it exists
-        if current.data[1] == name:
-          self.q.remove(index)
-          # await ctx.send("Removed " + name + " from queue!")
-          await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
-          return
-        current = current.next
-        index += 1
-      #If we reach end of list without finding song, it doesn't exist
-      await ctx.send(embed=self.createEmbed('Error', f'Song {name} is not in the queue'), delete_after=30)
-      return
+      #Delete song from queue and return it
+      try:
+        toRemove = self.q.remove(index)
+      except:
+        await ctx.send(embed=self.createEmbed('Error', f'There is no song at position {index + 1} in the queue!'), delete_after=30)
+      else:
+        await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
+        return
     await ctx.send(embed=self.createEmbed('Error', "Queue is empty"), delete_after=30)
 
   @commands.command()
@@ -155,7 +150,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     if self.q.isEmpty():
       await ctx.send(self.createEmbed('Error', "Queue is already empty!"), delete_after=30)
       return
-    name = self.q.head.data[1]
+    name = self.q.getHead().getData()[1]
     self.voiceClient.stop()
     await ctx.send(embed=self.createEmbed('Success', f'Skipped {name}!'), delete_after=30)
     return
@@ -173,7 +168,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         return
       if volume >= 0 and volume <= 1:
         #Set the volume of the current audioSource to specified volume
-        self.q.head.data[0].volume = volume
+        self.q.getHead().getData()[0].volume = volume
 
   @commands.command()
   async def queue(self, ctx):
@@ -191,6 +186,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
   @tasks.loop(seconds=30)
   async def checkInactivity(self):
     #Check if we're the only ones in the voice channel
+    #Need context to invoke leave function
     if self.voiceClient != None and len(self.voiceClient.channel.members) == 1:
       await self.Context.invoke(self.bot.get_command('leave'))
 
@@ -230,7 +226,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         title = info['title']
         duration = info['duration']
       try:
-        #Randomly got a HTTP 403 Forbidden error once, placeholder to handle that for now
+        #Randomly got a HTTP 403 Forbidden error once, placeholder to handle that for now (Have generic error msg in play() function to handle this for now)
         return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, duration, search)
       except:
         raise Exception()
@@ -243,7 +239,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       duration = int(audioFile.info.length)
       return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
     else:
-      #TODO - Choose specific exception
+      #Specified clip doesn't exist (does this raise OSError?) 
       raise Exception()
 
   def createEmbed(self, header, content):
@@ -268,7 +264,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
   def printQueue(self):
     #Returns string of names and durations of all songs in queue
     result = ''
-    current = self.q.head
+    current = self.q.getHead()
     index = 1
     while current != None:
       minutes = current.data[2] // 60
@@ -278,39 +274,53 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       index += 1
     return result
 
-# class queue:
 class linkedList:
-  class node:
+  class Node:
     def __init__(self, data):
       self.data = data
       self.next = None
+
+    def getNext(self):
+      return self.next
+
+    def setNext(self, node):
+      self.next = node
+
+    def getData(self):
+      return self.data
   
   def __init__(self):
     self.size = 0
     self.head = None
     self.rear = None
 
+  def getHead(self):
+    return self.head
+
+  def getSize(self):
+    return self.size
+
+  def isEmpty(self):
+    return self.size == 0
+
   def add(self, data):
     if self.size == 0:
-      self.head = self.node(data)
+      self.head = self.Node(data)
       self.rear = self.head
       self.size += 1
       return
-    # current = self.head
-    # while current.next != None:
-    #     current = current.next
-    self.rear.next = self.node(data)
+    self.rear.next = self.Node(data)
     self.rear = self.rear.next
     self.size += 1
 
   def remove(self, index):
-    if index == 0 and self.size > 0:
-        temp = self.head
-        self.head = temp.next
-        temp.next = None
-        self.size -= 1
-        return
-    if index <= self.size and self.size > 0:
+    if self.size > 0 and index < self.size and index >= 0:
+      if index == 0:
+          previous = self.head
+          self.head = previous.next
+          previous.next = None
+          self.size -= 1
+          return previous
       current = self.head
       previous = None
       for i in range(index):
@@ -319,48 +329,6 @@ class linkedList:
       previous.next= current.next
       current.next = None
       self.size -= 1
-
-  def get(self, index):
-    if index <= self.size:
-      if index == 0:
-        return self.head
-      current = self.head
-      for i in range(index):
-        current = current.next
       return current
-      
-  def length(self):
-    return self.size
-
-  def isEmpty(self):
-    return self.size == 0
-
-  # def __init__(self):
-  #   self.lList = self.linkedList()
-  #   self.front = None
-  #   self.rear = None
-
-  # def enqueue(self, data):
-  #   self.lList.add(data)
-  #   if self.front == None:
-  #     self.front = self.lList.head
-  #     self.rear = self.lList.head
-  #     return
-  #   self.rear = self.rear.next
-
-  # def dequeue(self):
-  #   if self.size() == 0:
-  #     return
-  #   self.front = self.front.next
-  #   self.lList.remove(0)
-  #   if self.front == None:
-  #     self.rear = None
-
-  # def peek(self):
-  #   return self.front
-
-  # def size(self):
-  #   return self.lList.length()
-
-  # def isEmpty(self):
-  #   return self.size() == 0
+    else:
+      raise Exception("Invalid index")
