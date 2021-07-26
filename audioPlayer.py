@@ -5,7 +5,7 @@ import discord
 import os
 import youtube_dl
 from mutagen.mp3 import MP3
-from requests import get
+import requests
 from discord.ext import tasks, commands
 
 class audioPlayer(commands.Cog):
@@ -52,8 +52,11 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     try:
       #Source is a tuple (audioSource, videoTitle, videoDuration, userInput) - don't like this
       source = self.parseCommand(userInput)
-    except:
-      await ctx.send(embed=self.createEmbed('Error', "Unable to play music file, please check command format is correct. If it's correct try again in a short while.", delete_atfer=30))
+    except discord.HTTPException:
+      await ctx.send(embed=self.createEmbed('Error', "Trouble connecting to the YouTube servers. Please try again in a short while."), delete_after=30)
+      return
+    except OSError:
+      await ctx.send(embed=self.createEmbed('Error', "There is no audio clip with the given name."), delete_after=30)
       return
 
     #If queue is empty, we add new song set up the player
@@ -99,8 +102,8 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     #Check if user input integer, if so change to 0 based indexing
     try:
       index = int(index) - 1
-    except:
-      await ctx.send(embed=self.createEmbed('Error', "Invalid command format"), delete_after=30)
+    except ValueError:
+      await ctx.send(embed=self.createEmbed('Error', "Invalid command format, please give a position in the queue that you want removed."), delete_after=30)
       return
     #Queue must have songs in it to remove
     if not self.q.isEmpty():
@@ -110,10 +113,10 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         self.voiceClient.stop()
         await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
         return
-      #Delete song from queue and return it
+      #Delete song from queue
       try:
-        toRemove = self.q.remove(index)
-      except:
+        self.q.remove(index)
+      except IndexError:
         await ctx.send(embed=self.createEmbed('Error', f'There is no song at position {index + 1} in the queue!'), delete_after=30)
       else:
         await ctx.message.add_reaction("<:pogNuts:827445043018858526>")
@@ -162,7 +165,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         #Cast input to int
         volume = int(volume)
         volume = volume / 100
-      except:
+      except ValueError:
         #Input was not an int
         await ctx.send(embed=self.createEmbed('Error', "Invalid command format"), delete_after=30)
         return
@@ -210,8 +213,9 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     with youtube_dl.YoutubeDL(ydlOptions) as ydl:
       try:
         #If the get request fails then we have a search string, not a url
-        get(search)
-      except:
+        #Seems janky but it works
+        requests.get(search)
+      except (requests.exceptions.MissingSchema, requests.exceptions.InvalidSchema):
         #Handle the case where the user entered a search
         #Returns a dictionary of search results, we take the first one
         info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
@@ -221,15 +225,15 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       else:
         #Handle the case where the user entered a youtube url
         #Returns a dictionary containing information about the given video
+        #No exception handling because we rely on parseCommand() to verify it's a youtube url
         info = ydl.extract_info(search, download=False)
         url = info['formats'][0]['url']
         title = info['title']
         duration = info['duration']
       try:
-        #Randomly got a HTTP 403 Forbidden error once, placeholder to handle that for now (Have generic error msg in play() function to handle this for now)
         return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, duration, search)
-      except:
-        raise Exception()
+      except discord.HTTPException as e:
+        raise e
 
   def getAudioClip(self, search):
     # I don't like this implementation btw
@@ -239,8 +243,8 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       duration = int(audioFile.info.length)
       return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
     else:
-      #Specified clip doesn't exist (does this raise OSError?) 
-      raise Exception()
+      #Specified clip doesn't exist
+      raise OSError("Clip with given name doesn't exist")
 
   def createEmbed(self, header, content):
     embed = discord.Embed()
@@ -329,6 +333,5 @@ class linkedList:
       previous.next= current.next
       current.next = None
       self.size -= 1
-      return current
     else:
-      raise Exception("Invalid index")
+      raise IndexError("Invalid index")
