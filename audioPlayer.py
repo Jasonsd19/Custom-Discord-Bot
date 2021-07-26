@@ -1,11 +1,9 @@
-import datetime
 import ffmpeg
 import asyncio
 import discord
 import os
 import youtube_dl
 from mutagen.mp3 import MP3
-import requests
 from discord.ext import tasks, commands
 
 class audioPlayer(commands.Cog):
@@ -24,7 +22,6 @@ class audioPlayer(commands.Cog):
   @commands.command(description='$play [filename]\nFilename has to be a file in a local directory\nThe bot will join the voice channel the user is in, play the audio file.',
 help='Allows the bot to join in the voice chat and play an audio file!')
   async def play(self, ctx, *args):
-    #The play function seems overloaded, it does too many things
     userInput = ' '.join(args)
     #Grabbing context for inactivityCheck loop - seems janky must be better way
     self.Context = ctx
@@ -48,16 +45,21 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       await ctx.send(embed=self.createEmbed('Error', "You need to be in a voice channel!"), delete_after=30)
       return
 
-    #Try to grab audio source - TODO give specific response for HTTP 403 and os errors
+    #Try to grab audio source
     try:
       #Source is a tuple (audioSource, videoTitle, videoDuration, userInput) - don't like this
       source = self.parseCommand(userInput)
-    except discord.HTTPException:
-      await ctx.send(embed=self.createEmbed('Error', "Trouble connecting to the YouTube servers. Please try again in a short while."), delete_after=30)
+    except youtube_dl.utils.DownloadError as e:
+      print(f'Here\'s the exception: {e}')
+      await ctx.send(embed=self.createEmbed('Error', "Trouble connecting to the YouTube servers. Please make sure the YouTube link provided is working. If it is try again in a short while."), delete_after=30)
       return
-    except OSError:
+    except OSError as e:
+      print(f'Here\'s the exception: {e}')
       await ctx.send(embed=self.createEmbed('Error', "There is no audio clip with the given name."), delete_after=30)
       return
+    except Exception as e:
+      print(f'I don\'t know what happened lol, here\'s the exception: {e}')
+      await ctx.send(embed=self.createEmbed('Error', "Something weird happened, please try again in a short while."), delete_after=30)
 
     #If queue is empty, we add new song set up the player
     if self.q.isEmpty():
@@ -212,31 +214,24 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
     with youtube_dl.YoutubeDL(ydlOptions) as ydl:
       try:
-        #If the get request fails then we have a search string, not a url
-        #Seems janky but it works
-        requests.get(search)
-      except (requests.exceptions.MissingSchema, requests.exceptions.InvalidSchema):
-        #Handle the case where the user entered a search
-        #Returns a dictionary of search results, we take the first one
-        info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
+        if search[0] == '-':
+          #Here we search for a youtube video with the given search
+          info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
+        else:
+          #Here we directly access the video with the given url
+          info = ydl.extract_info(search, download=False)['formats'][0]
         url = info['url']
         title = info['title']
         duration = info['duration']
-      else:
-        #Handle the case where the user entered a youtube url
-        #Returns a dictionary containing information about the given video
-        #No exception handling because we rely on parseCommand() to verify it's a youtube url
-        info = ydl.extract_info(search, download=False)
-        url = info['formats'][0]['url']
-        title = info['title']
-        duration = info['duration']
-      try:
         return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, duration, search)
-      except discord.HTTPException as e:
+      except youtube_dl.utils.DownloadError as e:
+        #Either we were given a broken link or the youtube servers are having trouble (these are the most likely reasons, I think anyways)
+        raise e
+      except Exception as e:
+        #Hopefully we never get here :)
         raise e
 
   def getAudioClip(self, search):
-    # I don't like this implementation btw
     path = 'audio/' + search + '.mp3'
     if os.path.exists(path):
       audioFile = MP3(path)
