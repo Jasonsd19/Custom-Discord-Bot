@@ -2,6 +2,7 @@ import requests
 import random
 import asyncio
 import datetime
+from replit import db
 from bs4 import BeautifulSoup
 from discord.ext import tasks, commands
 
@@ -95,6 +96,7 @@ class MemeApi(commands.Cog):
     url = 'https://meme-api.herokuapp.com/gimme'
     r = self._callApi(url)
     return r.json()['url']
+
 
   def getAnimalPic(self):
     i = random.randint(1, 99)
@@ -193,3 +195,55 @@ class magic8BallApi(commands.Cog):
     r = self._callApi(url)
     responseJSON = r.json()
     await ctx.send('The magic 8-Ball says: ' + responseJSON['magic']['answer'])
+
+@addCallApi
+class complimentApi(commands.Cog):
+  def __init__(self, bot):
+    self.bot = bot
+
+  @commands.command()
+  async def complimentMe(self, ctx):
+    user = ctx.author.mention
+    compliment = self.getCompliment()
+    await ctx.send(f"Hey {user}, {compliment}")
+
+  @commands.command()
+  async def compliment(self, ctx, mention: str):
+    try:
+      if mention[0] == '<' and mention[-1] == '>':
+        compliment = self.getCompliment()
+        await ctx.send(f"Hey {mention}, {compliment}")
+      else:
+        raise Exception("Incorrect format")
+    except:
+      await ctx.send("Incorrect format")
+
+  def getCompliment(self):
+    url = 'https://complimentr.com/api'
+    r = self._callApi(url)
+    json = r.json()
+    compliment = json['compliment']
+    return compliment
+
+@addCallApi
+class excuseApi(commands.Cog):
+  def __init__(self, bot):
+    self.bot = bot
+
+  @commands.command()
+  async def excuse(self, ctx):
+    excuses = db['excuses']
+    index = random.randint(0, len(excuses)-1)
+    excuse = excuses[index]
+    await ctx.send(excuse)
+
+  @commands.command()
+  async def addExcuse(self, ctx, *args):
+    excuse = ' '.join(args)
+    excuses = db['excuses']
+    if excuse in excuses:
+      await ctx.send("That excuse is already recorded!")
+    else:
+      db['excuses'].append(excuse)
+      await ctx.send("Excuse has been recorded!")
+    

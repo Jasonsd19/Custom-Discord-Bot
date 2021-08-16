@@ -38,6 +38,8 @@ bot.add_cog(apiCalls.coinflipAPI(bot))
 bot.add_cog(apiCalls.diceAPI(bot))
 bot.add_cog(apiCalls.insultApi(bot))
 bot.add_cog(apiCalls.magic8BallApi(bot))
+bot.add_cog(apiCalls.complimentApi(bot))
+bot.add_cog(apiCalls.excuseApi(bot))
 
 bot.add_cog(audioPlayer.audioPlayer(bot))
 

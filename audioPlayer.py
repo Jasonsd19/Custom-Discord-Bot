@@ -4,6 +4,7 @@ import discord
 import os
 import youtube_dl
 from mutagen.mp3 import MP3
+from mutagen import MutagenError
 from discord.ext import tasks, commands
 
 class audioPlayer(commands.Cog):
@@ -59,7 +60,9 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       return
     except Exception as e:
       print(f'I don\'t know what happened lol, here\'s the exception: {e}')
+      print(f'And here is the user input {userInput}')
       await ctx.send(embed=self.createEmbed('Error', "Something weird happened, please try again in a short while."), delete_after=30)
+      return
 
     #If queue is empty, we add new song set up the player
     if self.q.isEmpty():
@@ -76,7 +79,8 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         while self.voiceClient.is_playing() or self.voiceClient.is_paused():
           await asyncio.sleep(1)
         self.voiceClient.stop()
-        self.q.remove(0)
+        if not self.q.isEmpty():
+          self.q.remove(0)
         #If we are looping we simply create another audioSource for the current song and add it to the end of the queue, 
         #If we are removing the song currently being played we do not want to re-add it to queue.
         if self.doLoop == True and self.doRemove == False:
@@ -217,12 +221,16 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         if search[0] == '-':
           #Here we search for a youtube video with the given search
           info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
+          url = info['url']
+          title = info['title']
+          duration = info['duration']
         else:
           #Here we directly access the video with the given url
-          info = ydl.extract_info(search, download=False)['formats'][0]
-        url = info['url']
-        title = info['title']
-        duration = info['duration']
+          #The return value is different for search and direct link lookup, so we handle finding the title differently
+          info = ydl.extract_info(search, download=False)
+          url = info['url']
+          title = info['title']
+          duration = info['duration']
         return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(url, **ffmpegOptions)), title, duration, search)
       except youtube_dl.utils.DownloadError as e:
         #Either we were given a broken link or the youtube servers are having trouble (these are the most likely reasons, I think anyways)
@@ -232,14 +240,20 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         raise e
 
   def getAudioClip(self, search):
-    path = 'audio/' + search + '.mp3'
-    if os.path.exists(path):
-      audioFile = MP3(path)
-      duration = int(audioFile.info.length)
+    try:
+      path = 'audio/' + search + '.mp3'
+      if os.path.exists(path):
+        audioFile = MP3(path)
+        duration = int(audioFile.info.length)
+        return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
+      else:
+        #Specified clip doesn't exist
+        raise OSError("Clip with given name doesn't exist")
+    #We get this exception when the mp3 doesn't have the correct headers/tags so we can't retrieve the duration
+    except MutagenError:
+      #For right now I just set the duration to 5 seconds b/c all the clips are usually short - maybe work on a better solution
+      duration = 5
       return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
-    else:
-      #Specified clip doesn't exist
-      raise OSError("Clip with given name doesn't exist")
 
   def createEmbed(self, header, content):
     embed = discord.Embed()
