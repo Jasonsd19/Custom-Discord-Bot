@@ -2,14 +2,14 @@ import requests
 import random
 import asyncio
 import datetime
-from replit import db
 from bs4 import BeautifulSoup
 from discord.ext import tasks, commands
+import redis
 
 def addCallApi(original_class):
-  def callApi(self, endpoint):
+  def callApi(self, endpoint, endpointHeaders={}):
     try:
-      r = requests.get(endpoint)
+      r = requests.get(endpoint, headers=endpointHeaders)
       r.raise_for_status()
     except requests.ConnectionError:
       #possible internet issue
@@ -50,8 +50,10 @@ class WallStreetBetsApi(commands.Cog):
 
 @addCallApi
 class MemeApi(commands.Cog):
-  def __init__(self, bot):
+  def __init__(self, bot, key):
     self.bot = bot
+    # Need an API key for the cat API (is there a better way to pass this in?)
+    self.key = key
     self.memeReminder = datetime.datetime.now()
     # Start the loop
     self.factAndPicAndMeme.start()
@@ -101,9 +103,9 @@ class MemeApi(commands.Cog):
   def getAnimalPic(self):
     i = random.randint(1, 99)
     if i > 66:
-      url = 'https://aws.random.cat/meow?ref=apilist.fun'
-      r = self._callApi(url)
-      return r.json()['file']
+      url = 'https://api.thecatapi.com/v1/images/search'
+      r = self._callApi(url, {"x-api-key":self.key})
+      return r.json()[0]['url']
     elif i > 33:
       url = 'https://random.dog/woof.json?ref=apilist.fun'
       r = self._callApi(url)
@@ -227,23 +229,20 @@ class complimentApi(commands.Cog):
 
 @addCallApi
 class excuseApi(commands.Cog):
-  def __init__(self, bot):
-    self.bot = bot
-
-  @commands.command()
-  async def excuse(self, ctx):
-    excuses = db['excuses']
-    index = random.randint(0, len(excuses)-1)
-    excuse = excuses[index]
-    await ctx.send(excuse)
-
-  @commands.command()
-  async def addExcuse(self, ctx, *args):
-    excuse = ' '.join(args)
-    excuses = db['excuses']
-    if excuse in excuses:
-      await ctx.send("That excuse is already recorded!")
+ def __init__(self, bot, db):
+   self.bot = bot
+   self.db = db
+   
+ @commands.command()
+ async def excuse(self, ctx):
+    if self.db.exists('excuses'):
+      excuse = self.db.srandmember('excuses')
+      await ctx.send(excuse)
     else:
-      db['excuses'].append(excuse)
-      await ctx.send("Excuse has been recorded!")
-    
+      await ctx.send("No excuses recorded, add one youself by using $addExcuse")
+
+ @commands.command()
+ async def addExcuse(self, ctx, *args):
+   excuse = ' '.join(args)
+   self.db.sadd('excuses', excuse)
+   await ctx.send("Excuse has been recorded!")

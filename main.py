@@ -1,19 +1,23 @@
-import os
 import discord
-import datetime
-import asyncio
 from discord.ext import tasks, commands
-from keepAlive import keepAlive
-from replit import db
+import json
 import apiCalls
 import audioPlayer
 import reminders
 import messageResponder
 import textGames
+import currency
+import redis
 
 bot = commands.Bot(command_prefix='$', intents=discord.Intents.all())
 
 game = discord.Game("$help for more information")
+
+#Load tokens and API keys from local file
+tokens = json.load(open('tokens.json', 'r'))
+
+#Connect to Redis database
+r = redis.Redis(host='localhost', port=6379, password=tokens['database'], decode_responses=True)
 
 @bot.event
 async def on_ready():
@@ -33,22 +37,22 @@ async def on_reaction_add(reaction, user):
     return
 
 bot.add_cog(apiCalls.WallStreetBetsApi(bot))
-bot.add_cog(apiCalls.MemeApi(bot))
+bot.add_cog(apiCalls.MemeApi(bot, tokens['cat-api-key']))
 bot.add_cog(apiCalls.coinflipAPI(bot))
 bot.add_cog(apiCalls.diceAPI(bot))
 bot.add_cog(apiCalls.insultApi(bot))
 bot.add_cog(apiCalls.magic8BallApi(bot))
 bot.add_cog(apiCalls.complimentApi(bot))
-bot.add_cog(apiCalls.excuseApi(bot))
+bot.add_cog(apiCalls.excuseApi(bot, r))
 
 bot.add_cog(audioPlayer.audioPlayer(bot))
 
-bot.add_cog(reminders.remindMove(bot))
-bot.add_cog(reminders.remindTest(bot))
+bot.add_cog(reminders.remindMove(bot, r))
 
 bot.add_cog(messageResponder.messageResponder(bot))
 
 bot.add_cog(textGames.connectFourText(bot))
 
-keepAlive()
-bot.run(os.environ['token'])
+bot.add_cog(currency.currency(bot, r))
+
+bot.run(tokens['bot'])
