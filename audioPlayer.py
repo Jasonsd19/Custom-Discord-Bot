@@ -287,6 +287,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       index += 1
     return result
 
+# My own scuffed linked list implementation that I use for the queue
 class linkedList:
   class Node:
     def __init__(self, data):

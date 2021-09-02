@@ -7,30 +7,34 @@ class connectFourText(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
-    # Vars for interacting with game
+    #Vars for interacting with game
     self.game = None
     self.isOver = False
 
-    # Vars for interacting with discord
+    #Vars for interacting with discord
     self.isPlaying = False
     self.gameMessage = None
     self.player1 = None
     self.player2 = None
     self.currentPlayer = None
 
-    # Emojis used for interacting (should never be changed)
+    #Emojis used for interacting (should never be changed)
     self.reactions = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣']
 
   def nextBoard(self, player, move):
+    #The next board state given a player and a move
     self.game.nextBoard(player, move)
 
   def hasWon(self, player):
+    #Returns whether a player has won or not
     return self.game.hasWon(player)
 
   def isValid(self, move):
+    #Returns whether a move is valid or not
     return self.game.isValid(move)
 
   def printBoard(self):
+    #Returns a string representation of the current board state
     return self.game.printBoard()
 
   def play(self, player, move):
@@ -41,11 +45,14 @@ class connectFourText(commands.Cog):
       raise Exception("Invalid move!")
 
   def createEmbed(self, content):
+    #This creates the embed that visually displays the state of the game, the content passed in should be a string rep of the board state
     embed = discord.Embed()
+    #Name is the header text of the embed, value is the body of the embed
     embed.add_field(name='Connect Four - Player ' + str(self.currentPlayer[0]) + ' it is your turn', value=content ,inline=False)
     return embed
 
   def getColumn(self, emoji):
+    #Takes in an emoji and returns an integer representing the column it's associated with
     i = 0
     for reaction in self.reactions:
       if emoji == reaction:
@@ -54,12 +61,14 @@ class connectFourText(commands.Cog):
         i += 1
 
   def nextPlayer(self):
+    #Cycle between players every move
     if self.currentPlayer == self.player1:
       self.currentPlayer = self.player2
     else:
       self.currentPlayer = self.player1
 
   def cleanupGame(self):
+    #Reset all the variables associated with the game
     self.game = None
     self.isOver = False
     self.isPlaying = False
@@ -120,13 +129,14 @@ class connectFourText(commands.Cog):
         #Reset class variables/attributes for next game
         self.cleanupGame()
       
-      #Remove the reaction applied by the user
+      #Remove the reaction applied by the user, so they can react again
       await reaction.remove(user)
       return
     return
 
   @commands.command()
   async def killGame(self, ctx):
+    #Terminates a game session
     self.cleanupGame()
     await ctx.send("Game has been stopped.")
   

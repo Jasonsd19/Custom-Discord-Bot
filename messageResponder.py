@@ -1,6 +1,7 @@
 from discord.ext import tasks, commands
 
 class messageResponder(commands.Cog):
+  #Deals with anything related to reacting/responding to messages that users send
   def __init__(self, bot):
     self.bot = bot
     self.sad_words = {"sad", "horrible", "lonely", "depressed", ":(", "gloomy", "tragic", "despair", "pain", "forlorn", "hurt", "hurting"}
@@ -9,18 +10,22 @@ class messageResponder(commands.Cog):
 
   @commands.Cog.listener('on_message')
   async def respondToSad(self, message):
+    #If the user has a message with a sad word, we give them some encouragement :)
     if self.sad_words.intersection(message.content.lower().split()) and self.isNotBot(message):
+      #Should have used f strings for this, would make it more readable, too lazy to do that so I wrote this instead
       await message.channel.send("Well {0}, this server has friends that still care and love you <:patW:673433778944737310>.".format(message.author.mention))
       return
 
   @commands.Cog.listener('on_message')
   async def respondToSleep(self, message):
+    #If the user has a message with a sleep word, we wish them a goodnight :)
     if self.sleep_words.intersection(message.content.lower().split()) and self.isNotBot(message):
       await message.channel.send("Good night {0}, hope you enjoyed your stay <:peepolove:822337341892853790>.".format(message.author.mention))
       return
 
   @commands.Cog.listener('on_message')
   async def respondToWinnersPing(self, message):
+    #Honestly idk why I added this
     if self.winnersID in message.raw_role_mentions and self.isNotBot(message):
       await message.add_reaction("<:pogNuts:827445043018858526>")
       return
@@ -36,6 +41,7 @@ class messageResponder(commands.Cog):
         #If Ray mentions the bot
         await message.channel.send("Hello father. I love you.")
         return
+        #All the others plebians
       await message.channel.send("<:wutface:823056657110007839> Don't @ me loser")
       return
   

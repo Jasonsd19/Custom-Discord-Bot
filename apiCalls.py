@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from discord.ext import tasks, commands
 import redis
 
+# A decorator that implements the callApi function for all the classes below
 def addCallApi(original_class):
   def callApi(self, endpoint, endpointHeaders={}):
     try:
@@ -21,7 +22,7 @@ def addCallApi(original_class):
     except requests.exceptions.TooManyRedirects:
       print(f"too many redirects bad url {endpoint}")
     except requests.exceptions.RequestException as e:
-      #all other exceptions
+      # all other exceptions
       print(e, f"fam if you reached this stage just die. Endpoint: {endpoint}")
     return r
   original_class._callApi = callApi
@@ -76,10 +77,11 @@ class MemeApi(commands.Cog):
 
   @tasks.loop(minutes=10)
   async def factAndPicAndMeme(self):
-    # if it has been  hours 8 since the last fact/pic/meme then send another
+    # if it has been  hours 8 since the last fact/pic/meme then send another **Need to move this functionality over to database
     if datetime.datetime.now() >= self.memeReminder:
       self.memeReminder = datetime.datetime.now() + datetime.timedelta(hours=8)
 
+      # Find all the channels we want to utilise and send the corresponding message
       for channel in self.bot.get_all_channels():
         channel_name = channel.name.lower()
         isMemeChannel = 'meme' in channel_name
@@ -89,7 +91,7 @@ class MemeApi(commands.Cog):
             await asyncio.sleep(2)
         elif channel.type.name.lower() == 'text' and isAnimalChannel:
             await channel.send(self.getCatFact())
-            await channel.send("Now enjoy a picture of a random animal.")
+            await channel.send("Now enjoy a picture (or gif!) of a random animal.")
             await asyncio.sleep(2)
             await channel.send(self.getAnimalPic())
             await asyncio.sleep(2)
@@ -128,6 +130,7 @@ class coinflipAPI(commands.Cog):
 
   @commands.command()
   async def flip(self, ctx):
+    # It's not actually an API I just scrape the image from the website lol
     url = 'https://www.random.org/coins/?num=1&cur=60-cad.0100c'
     r = self._callApi(url)
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -142,6 +145,7 @@ class diceAPI(commands.Cog):
 
   @commands.command()
   async def roll(self, ctx, dice: str):
+    # It's not actually an API I just scrape the image from the website lol
     url = 'http://roll.diceapi.com/html/' + dice
     try:
       r = self._callApi(url)
@@ -150,7 +154,7 @@ class diceAPI(commands.Cog):
       await ctx.send(imgLink)
     except:
       # Either we have a connection error or the input was invalid
-      # unsure about this try block
+      # Should make the error handeling more specific, might do it later, might not
       await ctx.send("Invalid format! We can only roll 'd6' or 'd20'")
 
 @addCallApi
@@ -160,23 +164,32 @@ class insultApi(commands.Cog):
 
   @commands.command()
   async def insultMe(self, ctx):
+    # Here we grab the author's mention, to be used by the bot in its response
     user = ctx.author.mention
+    # If the person being insulted is me, then don't insult them ;)
     if ctx.author.id == 387855771355840512:
       await ctx.send("I would never insult my creator.")
     else:
+      # Do insult all the other plebs
       await ctx.send(user + self.getInsult())
 
   @commands.command()
   async def insult(self, ctx, mention: str):
     try:
+      # Scuffed check to make sure the author actually mentioned someone
       if mention[0] == '<' and mention[-1] == '>':
+        # If someone tries to insult me, insult them instead
         if mention == '<@!387855771355840512>':
           await ctx.send("I would never insult my creator, but I would insult you\n" + ctx.author.mention + self.getInsult())
         else:
+          # If it's not me then just insult the person lol
           await ctx.send(mention + ' ' + self.getInsult())
       else:
+        # The author did not actually mention someone
         raise Exception("Incorrect format")
     except:
+      # I put this here to catch the cases where the author input something other than a string (is that even possible?)
+      # Also need to make error handeling more specific
       await ctx.send("Incorrect format")
 
   def getInsult(self):
@@ -192,6 +205,8 @@ class magic8BallApi(commands.Cog):
 
   @commands.command()
   async def ask(self, ctx, *args):
+    # If there is a space between words after the $ask command, they are taken to be seperate arguments for the function
+    # So here we take in an arbitrary number of arguments and create a string out of them (with spaces inbetween)
     question = ' '.join(args)
     url = 'https://8ball.delegator.com/magic/JSON/' + question
     r = self._callApi(url)
@@ -205,6 +220,7 @@ class complimentApi(commands.Cog):
 
   @commands.command()
   async def complimentMe(self, ctx):
+    # Grab author's mention
     user = ctx.author.mention
     compliment = self.getCompliment()
     await ctx.send(f"Hey {user}, {compliment}")
@@ -212,12 +228,16 @@ class complimentApi(commands.Cog):
   @commands.command()
   async def compliment(self, ctx, mention: str):
     try:
+      # Scuffed check to make sure the author actually mentioned someone
       if mention[0] == '<' and mention[-1] == '>':
         compliment = self.getCompliment()
         await ctx.send(f"Hey {mention}, {compliment}")
       else:
+        # The author did not actually mention someone
         raise Exception("Incorrect format")
     except:
+      # I put this here to catch the cases where the author input something other than a string (is that even possible?)
+      # Also need to make error handeling more specific
       await ctx.send("Incorrect format")
 
   def getCompliment(self):
@@ -235,14 +255,18 @@ class excuseApi(commands.Cog):
    
  @commands.command()
  async def excuse(self, ctx):
+   # Check if the excuses key exists in the database
     if self.db.exists('excuses'):
+      # If it exists we grab a random excuse from the set
       excuse = self.db.srandmember('excuses')
       await ctx.send(excuse)
     else:
+      # If it doesn't exist we prompt the users to add excuses
       await ctx.send("No excuses recorded, add one youself by using $addExcuse")
 
  @commands.command()
  async def addExcuse(self, ctx, *args):
    excuse = ' '.join(args)
+   # Here we add the exuse to the database, and create the key if it doesn't exist (eg. it's the first excuse to be added)
    self.db.sadd('excuses', excuse)
    await ctx.send("Excuse has been recorded!")
