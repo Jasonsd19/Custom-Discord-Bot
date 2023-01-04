@@ -84,7 +84,9 @@ class connectFourText(commands.Cog):
       #Initialise a new connect four board
       self.game = connectFour.Game(6, 7)
       #Discord mentions are inconsistent, some include '!' others do not
-      #So we store both possibilities as a tuple alongside the player ID
+      #So we store both possibilities as a tuple alongside the player ID (which is either 1 or 2)
+      #Potential solution to this is to extract user discord id from mentions and use that instead:
+      # id = mention1.replace("@", "").replace("!", "")[1:-1]
       self.player1 = (1, mention1, mention1.replace('!', ''))
       self.player2 = (2, mention2, mention2.replace('!', ''))
       #We start the game with player 1
@@ -125,7 +127,7 @@ class connectFourText(commands.Cog):
       if self.isOver:
         #We cycle back to the player that made the winning move
         self.nextPlayer()
-        await reaction.message.channel.send(self.currentPlayer[1] + " Congratulations you win!")
+        await reaction.message.channel.send(f'{self.currentPlayer[1]} Congratulations you won the connect four game! Sorry {self.nonCurrentPlayer()[1]} you lost :slight_frown:')
         #Reset class variables/attributes for next game
         self.cleanupGame()
       
@@ -139,4 +141,10 @@ class connectFourText(commands.Cog):
     #Terminates a game session
     self.cleanupGame()
     await ctx.send("Game has been stopped.")
+
+  def nonCurrentPlayer(self):
+    if self.currentPlayer == self.player1:
+      return self.player2
+    else:
+      return self.player1
   

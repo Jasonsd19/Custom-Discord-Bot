@@ -7,6 +7,7 @@ import reminders
 import messageResponder
 import textGames
 import currency
+import bang
 import redis
 
 #                                        ****** LOOK HERE ******
@@ -64,6 +65,7 @@ bot.add_cog(reminders.remindMove(bot, r))
 bot.add_cog(messageResponder.messageResponder(bot))
 bot.add_cog(textGames.connectFourText(bot))
 bot.add_cog(currency.currency(bot, r))
+bot.add_cog(bang.bang(bot, r))
 
 # Finally we actually run the bot (and start the event loop, I think...)
 bot.run(tokens['bot'])

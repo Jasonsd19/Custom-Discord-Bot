@@ -190,7 +190,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
   @commands.command()
   async def clips(self, ctx):
     #Send a message containing names of audio clips that can be played
-    await ctx.send(self.listClips())
+    await ctx.send(embed=self.createEmbed("Clip Names", f"```{self.listClips()}```"))
 
   @tasks.loop(seconds=30)
   async def checkInactivity(self):
@@ -202,11 +202,11 @@ help='Allows the bot to join in the voice chat and play an audio file!')
   def parseCommand(self, name):
     #Determines whether the commands is to play a youtube link,
     #search and play a song on youtube, or play an audio clip
-    if (('youtube.com' in name) or ('youtu.be' in name)) or (len(name) > 1 and name[0] == '-'):
+    if (len(name) > 1 and name[0] == '-'):
+      return self.getAudioClip(name)
+    else:
       #here '-' symbolises a youtube search instead of a url
       return self.grabYTVideo(name)
-    else:
-      return self.getAudioClip(name)
 
   def grabYTVideo(self, search):
     #Options specify to grab best audio possible, and to not grab playlists
@@ -218,16 +218,16 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
     with youtube_dl.YoutubeDL(ydlOptions) as ydl:
       try:
-        if search[0] == '-':
-          #Here we search for a youtube video with the given search
-          info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
+        if (('youtube.com' in search) or ('youtu.be' in search)):
+          #Here we directly access the video with the given url
+          #The return value is different for search and direct link lookup, so we handle finding the title differently
+          info = ydl.extract_info(search, download=False)
           url = info['url']
           title = info['title']
           duration = info['duration']
         else:
-          #Here we directly access the video with the given url
-          #The return value is different for search and direct link lookup, so we handle finding the title differently
-          info = ydl.extract_info(search, download=False)
+          #Here we search for a youtube video with the given search
+          info = ydl.extract_info(f"ytsearch:{search[1:]}", download=False)['entries'][0]
           url = info['url']
           title = info['title']
           duration = info['duration']
@@ -240,12 +240,13 @@ help='Allows the bot to join in the voice chat and play an audio file!')
         raise e
 
   def getAudioClip(self, search):
+    clip = search[1:]
     try:
-      path = 'audio/' + search + '.mp3'
+      path = 'audio/' + clip + '.mp3'
       if os.path.exists(path):
         audioFile = MP3(path)
         duration = int(audioFile.info.length)
-        return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
+        return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), clip + '.mp3', duration, clip)
       else:
         #Specified clip doesn't exist
         raise OSError("Clip with given name doesn't exist")
@@ -253,7 +254,7 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     except MutagenError:
       #For right now I just set the duration to 5 seconds b/c all the clips are usually short - maybe work on a better solution
       duration = 5
-      return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), search + '.mp3', duration, search)
+      return (discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(path)), clip + '.mp3', duration, clip)
 
   def createEmbed(self, header, content):
     embed = discord.Embed()
@@ -264,15 +265,13 @@ help='Allows the bot to join in the voice chat and play an audio file!')
     #TODO - Super ugly, try to format names and make it look nice
     result = ''
     files = os.listdir('audio/')
-    i = 0
+    list = []
     for file in files:
       name = file.split('.')[0]
-      if i%5 == 0 and i != 0:
-        result += f'[{name}]\n'
-      else:
-        result += f'[{name}]'
-      i += 1
-    return result
+      list.append(name)
+    list.sort()
+    listFmt = self.fmtcols(list, 3)
+    return listFmt
 
   def printQueue(self):
     #Returns string of names and durations of all songs in queue
@@ -286,6 +285,14 @@ help='Allows the bot to join in the voice chat and play an audio file!')
       current = current.next
       index += 1
     return result
+
+  def fmtcols(self, mylist, cols):
+    # credit to S.Lott - https://stackoverflow.com/users/10661/s-lott
+    maxwidth = max(list(map(lambda x: len(x), mylist)))
+    justifyList = list(map(lambda x: x.ljust(maxwidth), mylist))
+    lines = (' '.join(justifyList[i:i+cols]) 
+            for i in range(0,len(justifyList),cols))
+    return "\n".join(lines)
 
 # My own scuffed linked list implementation that I use for the queue
 class linkedList:
